@@ -1,0 +1,18 @@
+{
+  "name": "twitter-consolidate",
+  "version": "1.0.0",
+  "description": "",
+  "bin": {
+    "consolidate": "bin/1_create_consolidation.js"
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "author": "Michael Kreil",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "work-faster": "^0.3.1"
+  }
+}
