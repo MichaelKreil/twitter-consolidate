@@ -5,15 +5,7 @@
 import 'work-faster';
 import { spawn } from 'child_process';
 import { resolve } from 'path';
-import { existsSync, mkdirSync, readdirSync } from 'fs';
-// import { createRandomString } from '../lib/helper.js';
-// import { createCommands } from '../lib/cluster_helper.js';
-
-const [mod, rem] = [[2, 1], [3, 0]].map(([i, d]) => {
-	let v = parseInt(process.argv[i], 10);
-	return isNaN(v) ? d : v
-});
-
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 
 const topics = [
 	//{name:'brexit', reg:/^brexit/},
@@ -28,7 +20,6 @@ const topics = [
 
 const srcPath = '/root/data/twitter/data_280';
 const dstPath = '/root/data/twitter/consolidated';
-const tmpPath = '/root/data/tmp';
 
 
 for (let topic of topics) {
@@ -46,26 +37,33 @@ async function processTopic(topic) {
 		let files = readdirSync(folder);
 		files.forEach(file => {
 			if (file.endsWith('.DAV')) return;
-			//if (!file.endsWith('.jsonstream.xz')) return;
 			let date = file.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/)[1];
-			if (!entries.has(date)) entries.set(date, { date, files: [] });
+			if (!entries.has(date)) entries.set(date, { date, files: [], order: Math.random() });
 			entries.get(date).files.push(resolve(folder, file));
 		})
 	}
 	entries = Array.from(entries.values());
-	entries = entries.filter(e => Math.round(Date.parse(e.date) / 86400000) % mod === rem);
-	entries.sort((a, b) => a.date < b.date ? -1 : 1);
+	entries.sort((a, b) => a.order - b.order);
 
 	let folderDst = resolve(dstPath, topic.name);
 	mkdirSync(folderDst, { recursive: true });
 
+
+	let i = 0, n = entries.length;
+	let progress = Progress();
+	progress.update(0);
+
 	await entries.forEachAsync(async entry => {
-		console.log('start', entry.date);
 
 		let filenameDst = resolve(folderDst, topic.name + '_' + entry.date + '.jsonl.xz');
-		let filenameTmp = resolve(folderDst, topic.name + '_' + entry.date + '.tmp.xz');
+		let filenameTmp = filenameDst+'.tmp';
 
 		if (existsSync(filenameDst)) return;
+		if (existsSync(filenameTmp)) return;
+		writeFileSync(filenameTmp, '');
+
+		console.log('start', entry.date);
+
 		let command = [
 			'xz -dc', entry.files.join(' '),
 			'| sort -ub --compress-program=lz4 | xz -z9e >', filenameTmp,
@@ -73,11 +71,37 @@ async function processTopic(topic) {
 		].join(' ');
 
 		await new Promise(res => {
-			let child = spawn('bash', ['-c', command]);
+			let child = spawn('bash', ['-c', command], { stdio: 'inherit' });
+			child.on('error', (a, b, c) => console.log(a, b, c));
 			child.on('close', code => {
-				//console.log(`child process exited with code ${code}`);
+				if (code !== 0) throw Error();
 				res();
 			});
 		})
+
+		i++;
+		progress.update(i / n);
 	})
+
+	progress.finish();
+}
+
+function Progress(prefix = '   ') {
+	let start = Date.now();
+
+	return {
+		update,
+		finish,
+	}
+	function update(progress) {
+		let eta = (Date.now() - start) * (1 - progress) / progress / 1000;
+		let hours = Math.floor(eta / 3600);
+		let minutes = Math.floor(eta / 60 - hours * 60);
+		let seconds = Math.floor(eta - minutes * 60 - hours * 3600);
+		eta = hours + ':' + ('00' + minutes).slice(-2) + ':' + ('00' + seconds).slice(-2);
+		process.stderr.write('\x1b[2K\r' + prefix + (100 * progress).toFixed(2) + '% - ' + eta);
+	}
+	function finish() {
+		process.stderr.write('\x1b[2K\r' + prefix + 'Finished\n');
+	}
 }
