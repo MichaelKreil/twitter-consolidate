@@ -62,8 +62,6 @@ async function processTopic(topic) {
 		if (existsSync(filenameTmp)) return;
 		writeFileSync(filenameTmp, '');
 
-		console.log('start', entry.date);
-
 		let command = [
 			'xz -dc', entry.files.join(' '),
 			'| sort -ub --compress-program=lz4 | xz -z9e >', filenameTmp,
