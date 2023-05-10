@@ -11,9 +11,9 @@ const topics = [
 	{ name: 'article13', reg: /^article13/ },
 	{ name: 'brexit', reg: /^brexit/ },
 	{ name: 'climate', reg: /^(climate|fridaysforfuture|gretathunberg)/ },
-	
-	{ name: 'corona', reg: /^corona/ },
-	
+
+	//{ name: 'corona', reg: /^corona/ },
+
 	{ name: 'epstein', reg: /^epstein/ },
 	{ name: 'floridashooting', reg: /^floridashooting/ },
 	//{ name: 'georgefloyd', reg: /^georgefloyd/ },
@@ -35,6 +35,9 @@ for (let topic of topics) {
 async function processTopic(topic) {
 	console.log(`Process topic "${topic.name}"`);
 
+	let folderDst = resolve(dstPath, topic.name);
+	mkdirSync(folderDst, { recursive: true });
+
 	let folders = readdirSync(srcPath);
 	folders = folders.filter(f => topic.reg.test(f));
 	let entries = new Map();
@@ -44,25 +47,28 @@ async function processTopic(topic) {
 		files.forEach(file => {
 			if (file.endsWith('.DAV')) return;
 			let date = file.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/)[1];
-			if (!entries.has(date)) entries.set(date, { date, files: [], order: Math.random() });
+			if (!entries.has(date)) {
+				entries.set(date, {
+					date,
+					files: [],
+					order: date.split('').reverse().join(''),
+					filename: resolve(folderDst, topic.name + '_' + date + '.jsonl.xz')
+				})
+			};
 			entries.get(date).files.push(resolve(folder, file));
 		})
 	}
 	entries = Array.from(entries.values());
+	entries = entries.filter(e => !existsSync(e.filename));
 	entries.sort((a, b) => a.order - b.order);
-
-	let folderDst = resolve(dstPath, topic.name);
-	mkdirSync(folderDst, { recursive: true });
-
 
 	let i = 0, n = entries.length;
 	let progress = Progress();
 	progress.update(0);
 
 	await entries.forEachAsync(async entry => {
-
-		let filenameDst = resolve(folderDst, topic.name + '_' + entry.date + '.jsonl.xz');
-		let filenameTmp = filenameDst+'.tmp';
+		let filenameDst = entry.filename;
+		let filenameTmp = filenameDst + '.tmp';
 
 		if (existsSync(filenameDst)) return;
 		if (existsSync(filenameTmp)) return;
