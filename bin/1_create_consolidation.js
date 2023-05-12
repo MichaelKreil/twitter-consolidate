@@ -8,20 +8,20 @@ import { resolve } from 'path';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 
 const topics = [
-	{ name: 'article13', reg: /^article13/ },
-	{ name: 'brexit', reg: /^brexit/ },
-	{ name: 'climate', reg: /^(climate|fridaysforfuture|gretathunberg)/ },
+	// { name: 'corona', reg: /^corona/ },
 
-	//{ name: 'corona', reg: /^corona/ },
-
-	{ name: 'epstein', reg: /^epstein/ },
-	{ name: 'floridashooting', reg: /^floridashooting/ },
-	//{ name: 'georgefloyd', reg: /^georgefloyd/ },
-	{ name: 'hongkong', reg: /^hongkong/ },
-	{ name: 'syria', reg: /^syria/ },
+	// { name: 'article13', reg: /^article13/ },
+	// { name: 'brexit', reg: /^brexit/ },
+	// { name: 'climate', reg: /^(climate|fridaysforfuture|gretathunberg)/ },
+	// { name: 'epstein', reg: /^epstein/ },
+	// { name: 'floridashooting', reg: /^floridashooting/ },
+	// { name: 'hongkong', reg: /^hongkong/ },
+	// { name: 'syria', reg: /^syria/ },
 	{ name: 'racism', reg: /^racism/ },
-	//{ name: 'trump', reg: /^trump/ },
-	//{ name: 'uselection2020', reg: /^uselection2020/ },
+
+	{ name: 'georgefloyd', reg: /^georgefloyd/ },
+	{ name: 'trump', reg: /^trump/ },
+	{ name: 'uselection2020', reg: /^uselection2020/ },
 ];
 
 const srcPath = '/root/data/twitter/data_280';
