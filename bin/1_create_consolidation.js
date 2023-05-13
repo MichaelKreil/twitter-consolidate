@@ -46,7 +46,9 @@ async function processTopic(topic) {
 		let files = readdirSync(folder);
 		files.forEach(file => {
 			if (file.endsWith('.DAV')) return;
-			let date = file.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/)[1];
+			let date = file.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/);
+			if (!date) throw Error(resolve(folder, file));
+			date = date[1]
 			if (!entries.has(date)) {
 				entries.set(date, {
 					date,
