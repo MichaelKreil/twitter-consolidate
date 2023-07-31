@@ -8,15 +8,15 @@ import { resolve } from 'path';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs';
 
 const topics = [
-	// { name: 'corona', reg: /^corona/ },
+	{ name: 'corona', reg: /^corona/ },
 
-	// { name: 'article13', reg: /^article13/ },
-	// { name: 'brexit', reg: /^brexit/ },
-	// { name: 'climate', reg: /^(climate|fridaysforfuture|gretathunberg)/ },
-	// { name: 'epstein', reg: /^epstein/ },
-	// { name: 'floridashooting', reg: /^floridashooting/ },
-	// { name: 'hongkong', reg: /^hongkong/ },
-	// { name: 'syria', reg: /^syria/ },
+	{ name: 'article13', reg: /^article13/ },
+	{ name: 'brexit', reg: /^brexit/ },
+	{ name: 'climate', reg: /^(climate|fridaysforfuture|gretathunberg)/ },
+	{ name: 'epstein', reg: /^epstein/ },
+	{ name: 'floridashooting', reg: /^floridashooting/ },
+	{ name: 'hongkong', reg: /^hongkong/ },
+	{ name: 'syria', reg: /^syria/ },
 	{ name: 'racism', reg: /^racism/ },
 
 	{ name: 'georgefloyd', reg: /^georgefloyd/ },
