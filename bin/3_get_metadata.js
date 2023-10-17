@@ -1,54 +1,62 @@
 #!/bin/env node
 "use strict"
 
-const { resolve, dirname } = require('path');
-const { createRandomString } = require('../lib/helper.js');
-const { createCommands } = require('../lib/cluster_helper.js');
+import 'work-faster';
+import { spawn } from 'child_process';
+import { resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { Progress } from './lib.js';
 
 
+const srcPath = '/root/data/twitter/consolidated';
+const tmpPath = '/root/data/twitter/tmp';
+mkdirSync(tmpPath, { recursive: true });
 
-const path = '/twitter/consolidated';
-const tmpPath = '/tmp';
-const maxDate = (new Date(Date.now() - 3 * 86400000)).toISOString().slice(0, 10);
+const files = [];
 
-
-
-createCommands('3_metadata', async sftp => {
-
-	let todos = [];
-	let directories = await sftp.getDirectories(path);
-	for (let d of directories) {
-
-		console.log(' - scan ' + d.name);
-
-		let files = await sftp.getFiles(d.fullname);
-		files.forEach(f => {
-			let match = f.fullname.match(/\/([^\/]*)_(\d\d\d\d-\d\d-\d\d)\.(jsonstream|tsv)\.xz$/);
-			if (!match) return;
-
-			let name = match[1];
-			let date = match[2];
-			let type = match[3];
-			if (date > maxDate) return;
-
-			let dstFullname = resolve(dirname(f.fullname), name + '_' + date + '.' + type + '.meta.txt');
-			let tmpfile = resolve(tmpPath, 'result_' + createRandomString('3_' + dstFullname) + '.tmp');
-			let order = [date, name, '3'].join('_');
-
-			let commands = [
-				'scp -P 22 -i ~/.ssh/box u227041@u227041.your-storagebox.de:' + f.fullname + ' data.xz',
-				'cat data.xz | pee \'wc -c | sed "s/^/compressed, number of bytes: /"\' \'openssl dgst -hex -md5 | sed -E "s/^(.* )?/compressed, hash, md5: /"\' \'openssl dgst -hex -sha1 | sed -E "s/^(.* )?/compressed, hash, sha1: /"\' \'openssl dgst -hex -sha256 | sed -E "s/^(.* )?/compressed, hash, sha256: /"\' \'openssl dgst -hex -sha512 | sed -E "s/^(.* )?/compressed, hash, sha512: /"\' > metadata_compressed.txt',
-				'xz -dkc data.xz | pee \'wc -c | sed "s/^/uncompressed, number of bytes: /"\' \'wc -l | sed "s/^/uncompressed, number of lines: /"\' \'openssl dgst -hex -md5 | sed -E "s/^(.* )?/uncompressed, hash, md5: /"\' \'openssl dgst -hex -sha1 | sed -E "s/^(.* )?/uncompressed, hash, sha1: /"\' \'openssl dgst -hex -sha256 | sed -E "s/^(.* )?/uncompressed, hash, sha256: /"\' \'openssl dgst -hex -sha512 | sed -E "s/^(.* )?/uncompressed, hash, sha512: /"\' > metadata_uncompressed.txt',
-				'echo "name: ' + f.name + '" | cat - metadata_compressed.txt metadata_uncompressed.txt > metadata.txt',
-				'scp -P 22 -i ~/.ssh/box metadata.txt u227041@u227041.your-storagebox.de:' + tmpfile,
-				'echo "rename ' + tmpfile + ' ' + dstFullname + '" | sftp -q -P 22 -i ~/.ssh/box u227041@u227041.your-storagebox.de 2>&1',
-			];
-
-			todos.push({ dstFullname, order, commands });
-		})
-	}
-
-	return todos;
+console.log('scan:');
+readdirSync(srcPath).forEach(topic => {
+	let path = resolve(srcPath, topic);
+	if (!statSync(path).isDirectory) return;
+	console.log('   - ' + topic);
+	readdirSync(path).forEach(filename => {
+		if (!filename.endsWith('.jsonl.xz')) return;
+		files.push({ topic, filename, fullname: resolve(path, filename) });
+	})
 })
 
+files.sort(() => Math.random() - 0.5);
 
+console.log(`process ${files.length} files:`);
+let progress = Progress(), index = 0;
+progress.update(0);
+await files.forEachAsync(async (file, i) => {
+	let tempFilename = resolve(tmpPath, file.filename.replace(/\.json.*/, '.json'));
+
+	if (existsSync(tempFilename)) {
+		file.data = JSON.parse(readFileSync(tempFilename));
+		index++;
+		progress.update(index / files.length);
+		return
+	}
+
+	file.data = await new Promise(res => {
+		const child = spawn(
+			'bash',
+			['-c', `cat "${file.fullname}" | xz -d | node _analyse_tweets.js`]
+		);
+		const buffers = [];
+		child.stdout.on('data', chunk => buffers.push(chunk));
+		child.on('error', (a, b, c) => console.log(a, b, c));
+		child.on('close', code => {
+			if (code !== 0) throw Error();
+			res(JSON.parse(Buffer.concat(buffers)));
+		});
+	})
+
+	writeFileSync(tempFilename, JSON.stringify(file.data));
+	index++;
+	progress.update(index / files.length);
+}, 8)
+
+progress.finish();

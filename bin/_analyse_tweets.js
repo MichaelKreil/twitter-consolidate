@@ -1,31 +1,30 @@
 #!/bin/env node
 "use strict"
 
-const { each, pipeline, split2, spy } = require('mississippi2');
-const { createReadStream } = require('node:fs');
+import { each, pipeline, split, spy } from 'mississippi2';
 
-let size = 0, count = 0, types = new Map();
-const filename = process.argv[2];
+let uncompressed_size = 0, tweet_count = 0, reply_count = 0, retweet_count = 0;
+
 each(
 	pipeline(
-		createReadStream(filename),
-		spy(chunk => size += chunk.length),
-		split2()
+		process.stdin,
+		spy(chunk => uncompressed_size += chunk.length),
+		split()
 	),
 	(t, next) => {
 		if (t.length < 3) return next();
-		count++;
+		tweet_count++;
 		t = JSON.parse(t);
-		let type = [];
-		if (t.in_reply_to_status_id) type.push('reply');
-		if (t.retweeted_status) type.push('retweet');
-		if (t.is_quote_status) type.push('quote');
-		type = type.join(',');
-		types.set(type, (types.get(type) || 0) + 1);
+		if (t.in_reply_to_status_id) reply_count++;
+		if (t.retweeted_status) retweet_count++;
 		next()
 	},
 	() => {
-		console.log({ size, count, types });
+		process.stdout.write(JSON.stringify({
+			uncompressed_size,
+			tweet_count,
+			reply_count,
+			retweet_count
+		}));
 	}
 );
-
