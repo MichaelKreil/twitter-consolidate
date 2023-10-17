@@ -13,6 +13,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "mississippi2": "^1.0.5",
     "work-faster": "^0.3.1"
   }
 }
