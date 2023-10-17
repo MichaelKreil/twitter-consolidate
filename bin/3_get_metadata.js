@@ -1,3 +1,4 @@
+#!/bin/env node
 "use strict"
 
 const { resolve, dirname } = require('path');

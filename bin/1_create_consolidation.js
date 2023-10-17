@@ -1,5 +1,4 @@
 #!/bin/env node
-
 "use strict"
 
 import 'work-faster';

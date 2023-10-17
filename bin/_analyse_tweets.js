@@ -1,3 +1,5 @@
+#!/bin/env node
+"use strict"
 
 const { each, pipeline, split2, spy } = require('mississippi2');
 const { createReadStream } = require('node:fs');
