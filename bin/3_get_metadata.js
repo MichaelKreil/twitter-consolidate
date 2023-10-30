@@ -21,42 +21,46 @@ readdirSync(srcPath).forEach(topic => {
 	console.log('   - ' + topic);
 	readdirSync(path).forEach(filename => {
 		if (!filename.endsWith('.jsonl.xz')) return;
-		files.push({ topic, filename, fullname: resolve(path, filename) });
+		let fullname = resolve(path, filename);
+		let size = statSync(fullname).size;
+		files.push({ topic, filename, fullname, size });
 	})
 })
 
 files.sort(() => Math.random() - 0.5);
 
-console.log(`process ${files.length} files:`);
-let progress = Progress(), index = 0;
+let progress = Progress();
+let sizePos = 0;
+let sizeSum = files.reduce((s, f) => s + f.size, 0);
 progress.update(0);
+console.log(`process ${files.length} files with ${(sizeSum / 0x40000000).toFixed(1)} GB:`);
 await files.forEachAsync(async (file, i) => {
 	let tempFilename = resolve(tmpPath, file.filename.replace(/\.json.*/, '.json'));
 
 	if (existsSync(tempFilename)) {
 		file.data = JSON.parse(readFileSync(tempFilename));
-		index++;
-		progress.update(index / files.length);
-		return
+	} else {
+		file.data = await new Promise(res => {
+			const child = spawn(
+				'bash',
+				['-c', `cat "${file.fullname}" | xz -d | node _analyse_tweets.js`]
+			);
+			const buffers = [];
+			child.stdout.on('data', chunk => buffers.push(chunk));
+			child.stderr.on('data', chunk => console.log(String(chunk)));
+			child.on('error', (...args) => console.log(args));
+			child.on('close', code => {
+				if (code !== 0) throw Error();
+				res(JSON.parse(Buffer.concat(buffers)));
+			});
+		})
+		writeFileSync(tempFilename, JSON.stringify(file.data));
 	}
 
-	file.data = await new Promise(res => {
-		const child = spawn(
-			'bash',
-			['-c', `cat "${file.fullname}" | xz -d | node _analyse_tweets.js`]
-		);
-		const buffers = [];
-		child.stdout.on('data', chunk => buffers.push(chunk));
-		child.on('error', (a, b, c) => console.log(a, b, c));
-		child.on('close', code => {
-			if (code !== 0) throw Error();
-			res(JSON.parse(Buffer.concat(buffers)));
-		});
-	})
-
-	writeFileSync(tempFilename, JSON.stringify(file.data));
-	index++;
-	progress.update(index / files.length);
+	sizePos += file.size;
+	progress.update(sizePos / sizeSum);
 }, 8)
 
 progress.finish();
+
+console.log(files);
