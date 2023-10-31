@@ -48,7 +48,11 @@ await files.forEachAsync(async (file, i) => {
 			const buffers = [];
 			child.stdout.on('data', chunk => buffers.push(chunk));
 			child.stderr.on('data', chunk => console.log(String(chunk)));
-			child.on('error', (...args) => console.log(args));
+			child.on('error', (...args) => {
+				console.log(args);
+				console.log({ file });
+				process.exit();
+			});
 			child.on('close', code => {
 				if (code !== 0) throw Error();
 				res(JSON.parse(Buffer.concat(buffers)));
