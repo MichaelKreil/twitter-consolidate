@@ -9,8 +9,7 @@ import { Progress } from './lib.js';
 
 
 const srcPath = '/root/data/twitter/consolidated';
-const tmpPath = '/root/data/twitter/tmp';
-mkdirSync(tmpPath, { recursive: true });
+const tmpPath = '/root/data/twitter/consolidated_cache';
 
 const files = [];
 
@@ -35,9 +34,10 @@ console.log(`process ${files.length} files with ${(sizeSum / 0x40000000).toFixed
 let progress = Progress();
 await files.forEachAsync(async file => {
 	file.content = await analyseContent(file.fullname);
+	file.hash = await analyseHash(file.fullname);
 	sizePos += file.size;
 	progress.update(sizePos / sizeSum);
-}, 8)
+})
 
 progress.finish();
 
@@ -51,6 +51,8 @@ files.forEach(file => {
 		topics.set(file.topic, topic);
 	}
 	topic.push({
+		sha256: file.hash.sha256,
+		md5: file.hash.md5,
 		filename: file.filename,
 		size_compressed: file.size,
 		size_uncompressed: file.content.uncompressed_size,
@@ -75,7 +77,7 @@ function csv(data) {
 }
 
 async function analyseContent(fullname) {
-	let tempFilename = resolve(tmpPath, basename(fullname).replace(/\.json.*/, '.json'));
+	let tempFilename = resolve(tmpPath, 'content', basename(fullname).replace(/\.json.*/, '.json'));
 
 	if (existsSync(tempFilename)) {
 		return JSON.parse(readFileSync(tempFilename));
@@ -89,14 +91,12 @@ async function analyseContent(fullname) {
 		const buffers = [];
 		child.stdout.on('data', chunk => buffers.push(chunk));
 		child.stderr.on('data', chunk => console.log(String(chunk)));
-		child.on('error', (...args) => {
-			console.log(args);
-			console.log({ fullname });
+		child.on('error', (...error) => {
+			console.log({ error, fullname });
 			process.exit();
 		});
 		child.on('close', code => {
 			if (code !== 0) {
-
 				console.log({ fullname });
 				throw Error();
 			}
@@ -105,4 +105,39 @@ async function analyseContent(fullname) {
 	})
 	writeFileSync(tempFilename, JSON.stringify(data));
 	return data;
+}
+
+async function analyseHash(fullname) {
+	let tempFilename = resolve(tmpPath, 'hash', basename(fullname).replace(/\.json.*/, '.json'));
+
+	if (existsSync(tempFilename)) {
+		return JSON.parse(readFileSync(tempFilename));
+	}
+
+	const data = {
+		sha256: await calcHash('sha256sum'),
+		md5: await calcHash('md5sum'),
+	}
+	writeFileSync(tempFilename, JSON.stringify(data));
+	return data;
+
+	function calcHash(command) {
+		return new Promise(res => {
+			const child = spawn(command, [fullname]);
+			const buffers = [];
+			child.stdout.on('data', chunk => buffers.push(chunk));
+			child.stderr.on('data', chunk => console.log(String(chunk)));
+			child.on('error', (...error) => {
+				console.log({ error, fullname });
+				process.exit();
+			});
+			child.on('close', code => {
+				if (code !== 0) {
+					console.log({ fullname });
+					throw Error();
+				}
+				res(Buffer.concat(buffers).toString().replace(/\s.*/s, ''));
+			});
+		})
+	}
 }
