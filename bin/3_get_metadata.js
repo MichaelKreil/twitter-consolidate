@@ -3,8 +3,8 @@
 
 import 'work-faster';
 import { spawn } from 'child_process';
-import { basename, resolve } from 'path';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { resolve } from 'path';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import { Progress } from './lib.js';
 
 
@@ -33,11 +33,14 @@ let sizeSum = files.reduce((s, f) => s + f.size, 0);
 console.log(`process ${files.length} files with ${(sizeSum / 0x40000000).toFixed(1)} GB:`);
 let progress = Progress();
 await files.forEachAsync(async file => {
-	file.content = await analyseContent(file.fullname);
-	file.hash = await analyseHash(file.fullname);
+	const cachedFile = cacheFile(file);
+	file.content = await analyseContent(cachedFile);
+	file.hash = await analyseHash(cachedFile);
+	cachedFile.free()
+
 	sizePos += file.size;
 	progress.update(sizePos / sizeSum);
-})
+}, 2)
 
 progress.finish();
 
@@ -76,28 +79,29 @@ function csv(data) {
 	return data.map(entry => entry.join(',') + '\n').join('');
 }
 
-async function analyseContent(fullname) {
-	let tempFilename = resolve(tmpPath, 'content', basename(fullname).replace(/\.json.*/, '.json'));
+async function analyseContent(file) {
+	let tempFilename = file.getTempName('content');
 
 	if (existsSync(tempFilename)) {
 		return JSON.parse(readFileSync(tempFilename));
 	}
 
+	let filename = await file.cacheLocally();
 	const data = await new Promise(res => {
 		const child = spawn(
 			'bash',
-			['-c', `cat "${fullname}" | xz -d | node _analyse_tweets.js`]
+			['-c', `cat "${filename}" | xz -d | node _analyse_tweets.js`]
 		);
 		const buffers = [];
 		child.stdout.on('data', chunk => buffers.push(chunk));
 		child.stderr.on('data', chunk => console.log(String(chunk)));
 		child.on('error', (...error) => {
-			console.log({ error, fullname });
+			console.log({ error, filename });
 			process.exit();
 		});
 		child.on('close', code => {
 			if (code !== 0) {
-				console.log({ fullname });
+				console.log({ filename });
 				throw Error();
 			}
 			res(JSON.parse(Buffer.concat(buffers)));
@@ -107,13 +111,14 @@ async function analyseContent(fullname) {
 	return data;
 }
 
-async function analyseHash(fullname) {
-	let tempFilename = resolve(tmpPath, 'hash', basename(fullname).replace(/\.json.*/, '.json'));
+async function analyseHash(file) {
+	let tempFilename = file.getTempName('hash');
 
 	if (existsSync(tempFilename)) {
 		return JSON.parse(readFileSync(tempFilename));
 	}
 
+	let filename = await file.cacheLocally();
 	const data = {
 		sha256: await calcHash('sha256sum'),
 		md5: await calcHash('md5sum'),
@@ -123,21 +128,43 @@ async function analyseHash(fullname) {
 
 	function calcHash(command) {
 		return new Promise(res => {
-			const child = spawn(command, [fullname]);
+			const child = spawn(command, [filename]);
 			const buffers = [];
 			child.stdout.on('data', chunk => buffers.push(chunk));
 			child.stderr.on('data', chunk => console.log(String(chunk)));
 			child.on('error', (...error) => {
-				console.log({ error, fullname });
+				console.log({ error, filename });
 				process.exit();
 			});
 			child.on('close', code => {
 				if (code !== 0) {
-					console.log({ fullname });
+					console.log({ filename });
 					throw Error();
 				}
 				res(Buffer.concat(buffers).toString().replace(/\s.*/s, ''));
 			});
 		})
+	}
+}
+
+function cacheFile(file) {
+	let cachedFilename;
+	return { cacheLocally, free, getTempName }
+	function getTempName(category) {
+		return resolve(tmpPath, category, file.filename.replace(/\.json.*/, '.json'));
+	}
+	async function cacheLocally() {
+		cachedFilename = resolve('/root/data/temp/', file.filename);
+		await new Promise(res => {
+			const child = spawn('cp', [file.fullname, cachedFilename], { stdio: 'inherit' });
+			child.on('close', code => {
+				if (code !== 0) throw Error();
+				res();
+			});
+		})
+		return cachedFilename;
+	}
+	function free() {
+		if (cachedFilename) rmSync(cachedFilename);
 	}
 }
