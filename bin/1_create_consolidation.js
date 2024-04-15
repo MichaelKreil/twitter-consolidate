@@ -5,7 +5,7 @@ import 'work-faster';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { Progress } from './lib.rs';
+import { Progress } from './lib.js';
 
 const topics = [
 	{ name: 'corona', reg: /^corona/ },
