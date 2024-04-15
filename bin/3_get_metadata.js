@@ -54,14 +54,14 @@ files.forEach(file => {
 		topics.set(file.topic, topic);
 	}
 	topic.push({
-		sha256: file.hash.sha256,
-		md5: file.hash.md5,
 		filename: file.filename,
 		size_compressed: file.size,
 		size_uncompressed: file.content.uncompressed_size,
 		tweet_count: file.content.tweet_count,
 		reply_count: file.content.reply_count,
 		retweet_count: file.content.retweet_count,
+		sha256: file.hash.sha256,
+		md5: file.hash.md5,
 	})
 })
 

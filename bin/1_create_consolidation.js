@@ -22,6 +22,12 @@ const topics = [
 	{ name: 'georgefloyd', reg: /^georgefloyd/ },
 	{ name: 'trump', reg: /^trump/ },
 	{ name: 'uselection2020', reg: /^uselection2020/ },
+
+	{ name: 'brazilelection', reg: /^brazilelection/ },
+	{ name: 'capitol', reg: /^capitol/ },
+	{ name: 'infowars', reg: /^infowars/ },
+	{ name: 'iranprotests', reg: /^iranprotests/ },
+	{ name: 'ukraine', reg: /^ukraine/ },
 ];
 
 const srcPath = '/root/data/twitter/data_280';
