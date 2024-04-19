@@ -116,13 +116,13 @@ async function getEntries(topic: Topic, files: string[], folderDst: string): Pro
 	})
 	progress.finish();
 
-	const entryList = Array.from(entries.values()).filter(e => !e.ignore);
-
-	return entryList;
+	return Array.from(entries.values());
 }
 
 async function processEntries(entries: Entry[]) {
 	console.log(`   process ${entries.length} entries`);
+
+	entries = entries.filter(e => !e.ignore);
 
 	let i = 0;
 	const n = entries.reduce((s, e) => s + e.size, 0);
