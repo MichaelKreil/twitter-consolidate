@@ -79,8 +79,6 @@ async function processTopic(topic) {
 		let filenameTmp = filenameDst + '.tmp';
 
 		if (existsSync(filenameDst)) return;
-		if (existsSync(filenameTmp)) return;
-		writeFileSync(filenameTmp, '');
 
 		let command = [
 			'xz -dc', entry.files.join(' '),
