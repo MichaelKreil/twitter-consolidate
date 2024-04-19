@@ -84,7 +84,7 @@ async function processTopic(topic) {
 
 		let command = [
 			'xz -dc', entry.files.join(' '),
-			'| sort -ub --compress-program=lz4 | xz -z9e >', filenameTmp,
+			'| sort -ub --compress-program=gzip | xz -z9e >', filenameTmp,
 			'&& mv', filenameTmp, filenameDst
 		].join(' ');
 
