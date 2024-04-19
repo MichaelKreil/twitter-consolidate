@@ -2,8 +2,8 @@
   "name": "twitter-consolidate",
   "version": "1.0.0",
   "description": "",
-  "bin": {
-    "consolidate": "bin/1_create_consolidation.js"
+  "scripts": {
+    "consolidate": "tsx src/1_create_consolidation.ts"
   },
   "directories": {
     "lib": "lib"
@@ -13,7 +13,11 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "mississippi2": "^1.0.5",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5",
     "work-faster": "^0.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7"
   }
 }
