@@ -5,7 +5,7 @@ import { WF } from './lib/work-faster.ts';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { mkdirSync, readdirSync } from 'node:fs';
-import { Progress } from './lib/lib.ts';
+import { Progress } from './lib/progress.ts';
 import { access, stat } from 'node:fs/promises';
 
 interface Topic {
