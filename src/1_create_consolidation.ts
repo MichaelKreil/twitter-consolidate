@@ -48,11 +48,8 @@ const srcPath = '/root/data/twitter/data_280';
 const dstPath = '/root/data/twitter/consolidated';
 
 
+let allEntries: Entry[] = [];
 for (let topic of topics) {
-	await processTopic(topic);
-}
-
-async function processTopic(topic: Topic) {
 	console.log(`Process topic "${topic.name}"`);
 
 	let folderDst = resolve(dstPath, topic.name);
@@ -60,8 +57,12 @@ async function processTopic(topic: Topic) {
 
 	const files = await getFiles(topic);
 	const entries = await getEntries(topic, files, folderDst);
-	await processEntries(entries);
+	allEntries.push(...entries);
 }
+
+await processEntries(allEntries);
+
+
 
 async function getFiles(topic: Topic): Promise<string[]> {
 	console.log('   scan folders')

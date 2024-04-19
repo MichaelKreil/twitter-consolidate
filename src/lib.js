@@ -15,6 +15,7 @@ export function Progress(prefix = '   ') {
 		process.stderr.write('\x1b[2K\r' + prefix + (100 * progress).toFixed(2) + '% - ' + eta);
 	}
 	function finish() {
-		process.stderr.write('\x1b[2K\r' + prefix + 'Finished\n');
+		//process.stderr.write('\x1b[2K\r' + prefix + 'Finished\n');
+		process.stderr.write('\x1b[2K\r');
 	}
 }
