@@ -90,7 +90,9 @@ async function processTopic(topic) {
 			let child = spawn('bash', ['-c', command], { stdio: 'inherit' });
 			child.on('error', (a, b, c) => console.log(a, b, c));
 			child.on('close', code => {
-				if (code !== 0) throw Error();
+				if (code !== 0) {
+					console.error('error for ' + filenameDst);
+				};
 				res();
 			});
 		})
