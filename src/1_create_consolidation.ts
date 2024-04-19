@@ -65,7 +65,6 @@ await processEntries(allEntries);
 
 
 async function getFiles(topic: Topic): Promise<string[]> {
-	console.log('   scan folders')
 	return readdirSync(srcPath)
 		.filter(f => topic.reg.test(f))
 		.map(folder => resolve(srcPath, folder))
@@ -153,7 +152,7 @@ async function processEntries(entries: Entry[]) {
 
 		i += entry.size;
 		progress.update(i / n);
-	})
+	}, 3)
 
 	progress.finish();
 }

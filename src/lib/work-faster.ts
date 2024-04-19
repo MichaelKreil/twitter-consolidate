@@ -10,7 +10,7 @@ import { StringDecoder } from 'node:string_decoder';
 import { createGunzip, createBrotliDecompress } from 'node:zlib';
 
 interface Wrapper<T> {
-	forEachAsync: (callback: (element: T, index: number) => Promise<void>) => Promise<void>
+	forEachAsync: (callback: (element: T, index: number) => Promise<void>, maxParallel?:number) => Promise<void>
 }
 
 export function WF<T>(array: T[]): T[] & Wrapper<T> {
@@ -18,8 +18,8 @@ export function WF<T>(array: T[]): T[] & Wrapper<T> {
 	newArray.forEachAsync = forEachAsync;
 	return newArray;
 
-	async function forEachAsync(callback: (element: T, index: number) => Promise<void>): Promise<void> {
-		const maxParallel = os.cpus().length;
+	async function forEachAsync(callback: (element: T, index: number) => Promise<void>, maxParallel?:number): Promise<void> {
+		const concurrent = maxParallel ?? os.cpus().length;
 
 		return new Promise((resolve, reject) => {
 			let running = 0, index = 0, finished = false;
@@ -28,7 +28,7 @@ export function WF<T>(array: T[]): T[] & Wrapper<T> {
 
 			function next() {
 				if (finished) return;
-				if (running >= maxParallel) return;
+				if (running >= concurrent) return;
 				if (index >= array.length) {
 					if (running === 0) {
 						finished = true;
@@ -51,7 +51,7 @@ export function WF<T>(array: T[]): T[] & Wrapper<T> {
 						reject(err);
 					})
 
-				if (running < maxParallel) queueMicrotask(next);
+				if (running < concurrent) queueMicrotask(next);
 			}
 		})
 	}
