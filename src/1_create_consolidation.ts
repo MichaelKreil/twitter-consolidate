@@ -1,14 +1,26 @@
 #!/bin/env node
 "use strict"
 
-import 'work-faster';
+import { WF } from './lib/work-faster.ts';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { mkdirSync, readdirSync } from 'node:fs';
 import { Progress } from './lib.js';
 import { access, stat } from 'node:fs/promises';
 
-const topics = [
+interface Topic {
+	name: string,
+	reg: RegExp,
+}
+
+interface Entry {
+	date: string,
+	files: string[],
+	filename: string,
+	ignore: boolean,
+}
+
+const topics: Topic[] = [
 	{ name: 'corona', reg: /^corona/ },
 
 	{ name: 'article13', reg: /^article13/ },
@@ -39,7 +51,7 @@ for (let topic of topics) {
 	await processTopic(topic);
 }
 
-async function processTopic(topic) {
+async function processTopic(topic: Topic) {
 	console.log(`Process topic "${topic.name}"`);
 
 	let folderDst = resolve(dstPath, topic.name);
@@ -50,7 +62,7 @@ async function processTopic(topic) {
 	await processEntries(entries);
 }
 
-async function getFiles(topic) {
+async function getFiles(topic: Topic) {
 	console.log('   scan folders')
 	return readdirSync(srcPath)
 		.filter(f => topic.reg.test(f))
@@ -64,22 +76,22 @@ async function getFiles(topic) {
 		});
 }
 
-async function getEntries(topic, files, folderDst) {
+async function getEntries(topic: Topic, files: string[], folderDst: string) {
 	console.log(`   scan ${files.length} files`);
-	let entries = new Map();
+	let entries = new Map<string, Entry>();
 	let i = 0;
 	const n = files.length;
 	const progress = Progress();
-	await files.forEachAsync(async filenameIn => {
+	await WF(files).forEachAsync(async filenameIn => {
 		i++;
 		progress.update(i / n);
 
 		const { size } = await stat(filenameIn);
 		if (size < 64) return;
 
-		let date = filenameIn.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/);
-		if (!date) throw Error(filenameIn);
-		date = date[1]
+		let dateMatch = filenameIn.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/);
+		if (!dateMatch) throw Error(filenameIn);
+		const date = dateMatch[1]
 
 		if (!entries.has(date)) {
 			const filenameOut = resolve(folderDst, topic.name + '_' + date + '.jsonl.xz');
@@ -92,24 +104,21 @@ async function getEntries(topic, files, folderDst) {
 			entries.set(date, {
 				date,
 				files: [],
-				order: date.split('').reverse().join(''),
 				filename: filenameOut,
 				ignore
 			})
 		};
 
-		entries.get(date).files.push(filenameIn);
+		(entries.get(date) as Entry).files.push(filenameIn);
 	})
 	progress.finish();
 
-	entries = Array.from(entries.values());
-	entries = entries.filter(e => !e.ignore);
-	entries.sort((a, b) => a.order - b.order);
+	const entryList = Array.from(entries.values()).filter(e => !e.ignore);
 
-	return entries;
+	return entryList;
 }
 
-async function processEntries(entries) {
+async function processEntries(entries: Entry[]) {
 	console.log(`   process ${entries.length} entries`);
 
 	let i = 0;
@@ -117,7 +126,7 @@ async function processEntries(entries) {
 	const progress = Progress();
 	progress.update(0);
 
-	await entries.forEachAsync(async entry => {
+	await WF(entries).forEachAsync(async entry => {
 		let filenameDst = entry.filename;
 		let filenameTmp = filenameDst + '.tmp';
 
@@ -129,12 +138,12 @@ async function processEntries(entries) {
 
 		await new Promise(res => {
 			let child = spawn('bash', ['-c', command], { stdio: 'inherit' });
-			child.on('error', (a, b, c) => console.log(a, b, c));
+			child.on('error', (a: any, b: any, c: any) => console.log(a, b, c));
 			child.on('close', code => {
 				if (code !== 0) {
 					console.error('error for ' + filenameDst);
 				};
-				res();
+				res(null);
 			});
 		})
 
