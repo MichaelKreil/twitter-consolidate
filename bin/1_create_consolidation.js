@@ -4,8 +4,9 @@
 import 'work-faster';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { Progress } from './lib.js';
+import { access, stat } from 'node:fs/promises';
 
 const topics = [
 	{ name: 'corona', reg: /^corona/ },
@@ -44,41 +45,81 @@ async function processTopic(topic) {
 	let folderDst = resolve(dstPath, topic.name);
 	mkdirSync(folderDst, { recursive: true });
 
-	let folders = readdirSync(srcPath);
-	folders = folders.filter(f => topic.reg.test(f));
+	const files = await getFiles(topic);
+	const entries = await getEntries(topic, files, folderDst);
+	await processEntries(entries);
+}
+
+async function getFiles(topic) {
+	console.log('   scan folders')
+	return readdirSync(srcPath)
+		.filter(f => topic.reg.test(f))
+		.map(folder => resolve(srcPath, folder))
+		.flatMap(folder => {
+			resolve(srcPath, folder);
+			let files = readdirSync(folder);
+			files = files.filter(file => !file.endsWith('.DAV'));
+			files = files.map(file => resolve(folder, file));
+			return files;
+		});
+}
+
+async function getEntries(topic, files, folderDst) {
+	console.log(`   scan ${files.length} files`);
 	let entries = new Map();
-	for (let folder of folders) {
-		folder = resolve(srcPath, folder);
-		let files = readdirSync(folder);
-		files.forEach(file => {
-			if (file.endsWith('.DAV')) return;
-			let date = file.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/);
-			if (!date) throw Error(resolve(folder, file));
-			date = date[1]
-			if (!entries.has(date)) {
-				entries.set(date, {
-					date,
-					files: [],
-					order: date.split('').reverse().join(''),
-					filename: resolve(folderDst, topic.name + '_' + date + '.jsonl.xz')
-				})
-			};
-			entries.get(date).files.push(resolve(folder, file));
-		})
-	}
+	let i = 0;
+	const n = files.length;
+	const progress = Progress();
+	await files.forEachAsync(async filenameIn => {
+		i++;
+		progress.update(i / n);
+
+		const { size } = await stat(filenameIn);
+		if (size < 64) return;
+
+		let date = filenameIn.match(/_(\d{4}\-\d{2}\-\d{2})\.jsonstream\.xz$/);
+		if (!date) throw Error(filenameIn);
+		date = date[1]
+
+		if (!entries.has(date)) {
+			const filenameOut = resolve(folderDst, topic.name + '_' + date + '.jsonl.xz');
+			let ignore = true;
+			try {
+				await access(filenameOut)
+			} catch (e) {
+				ignore = false;
+			}
+			entries.set(date, {
+				date,
+				files: [],
+				order: date.split('').reverse().join(''),
+				filename: filenameOut,
+				ignore
+			})
+		};
+
+		entries.get(date).files.push(filenameIn);
+	})
+	progress.finish();
+
 	entries = Array.from(entries.values());
-	entries = entries.filter(e => !existsSync(e.filename));
+	entries = entries.filter(e => !e.ignore);
 	entries.sort((a, b) => a.order - b.order);
 
-	let i = 0, n = entries.length;
-	let progress = Progress();
+	return entries;
+}
+
+async function processEntries(entries) {
+	console.log(`   process ${entries.length} entries`);
+
+	let i = 0;
+	const n = entries.length;
+	const progress = Progress();
 	progress.update(0);
 
 	await entries.forEachAsync(async entry => {
 		let filenameDst = entry.filename;
 		let filenameTmp = filenameDst + '.tmp';
-
-		if (existsSync(filenameDst)) return;
 
 		let command = [
 			'xz -dc', entry.files.join(' '),
