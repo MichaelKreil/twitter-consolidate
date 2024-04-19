@@ -17,6 +17,7 @@ interface Entry {
 	date: string,
 	files: string[],
 	filename: string,
+	size: number,
 	ignore: boolean,
 }
 
@@ -62,7 +63,7 @@ async function processTopic(topic: Topic) {
 	await processEntries(entries);
 }
 
-async function getFiles(topic: Topic) {
+async function getFiles(topic: Topic): Promise<string[]> {
 	console.log('   scan folders')
 	return readdirSync(srcPath)
 		.filter(f => topic.reg.test(f))
@@ -71,12 +72,11 @@ async function getFiles(topic: Topic) {
 			resolve(srcPath, folder);
 			let files = readdirSync(folder);
 			files = files.filter(file => !file.endsWith('.DAV'));
-			files = files.map(file => resolve(folder, file));
-			return files;
+			return files.map(filename => resolve(folder, filename));
 		});
 }
 
-async function getEntries(topic: Topic, files: string[], folderDst: string) {
+async function getEntries(topic: Topic, files: string[], folderDst: string): Promise<Entry[]> {
 	console.log(`   scan ${files.length} files`);
 	let entries = new Map<string, Entry>();
 	let i = 0;
@@ -105,11 +105,14 @@ async function getEntries(topic: Topic, files: string[], folderDst: string) {
 				date,
 				files: [],
 				filename: filenameOut,
-				ignore
+				ignore,
+				size: 0,
 			})
 		};
 
-		(entries.get(date) as Entry).files.push(filenameIn);
+		const entry = entries.get(date) as Entry;
+		entry.files.push(filenameIn);
+		entry.size += size;
 	})
 	progress.finish();
 
@@ -122,7 +125,7 @@ async function processEntries(entries: Entry[]) {
 	console.log(`   process ${entries.length} entries`);
 
 	let i = 0;
-	const n = entries.length;
+	const n = entries.reduce((s, e) => s + e.size, 0);
 	const progress = Progress();
 	progress.update(0);
 
@@ -147,7 +150,7 @@ async function processEntries(entries: Entry[]) {
 			});
 		})
 
-		i++;
+		i += entry.size;
 		progress.update(i / n);
 	})
 
